@@ -1,0 +1,32 @@
+name: Build TB128FU Kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Variant'
+        required: true
+        default: 'stock'
+        type: choice
+        options:
+          - stock
+          - clean
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Android Kernel Build Action
+        uses: dabao1955/kernel_build_action@v1.10.6
+        with:
+          kernel_repo: Royna2544/kernel_lenovo_tb128fu
+          kernel_branch: master
+          kernel_folder: kernel_sm6225
+          kernel_config: stock_defconfig
+          clang_version: r416183b
+          clang_location: github
+          ktool: None
+          aosp_kernel_tools: false
+          github_bot: false
+          html_reports: false
+          clone_depth: 1
