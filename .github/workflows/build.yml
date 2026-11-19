@@ -29,7 +29,9 @@ jobs:
           echo "$HOME/clang/bin" >> $GITHUB_PATH
 
       - name: Build
+        shell: bash
         run: |
+          set -o pipefail
           export ARCH=arm64
           export SUBARCH=arm64
           make O=out grass-perf_defconfig
@@ -40,6 +42,13 @@ jobs:
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             LLVM=1 LLVM_IAS=1 2>&1 | tee build.log
 
+      - name: Show build errors
+        if: failure()
+        run: |
+          grep -n -B2 -A6 -E "error:|Error [0-9]|undefined reference" build.log | head -80 || true
+          echo "----- tail -----"
+          tail -40 build.log
+
       - name: Package with AnyKernel3
         run: |
           cp out/arch/arm64/boot/Image AnyKernel3/
@@ -47,9 +56,11 @@ jobs:
           cd AnyKernel3 && zip -r9 ../tb128fu-kernel.zip . -x '.git*'
 
       - name: Upload zip and raw Image
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: tb128fu-kernel
+          if-no-files-found: warn
           path: |
             tb128fu-kernel.zip
             out/arch/arm64/boot/Image
