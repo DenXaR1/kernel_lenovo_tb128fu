@@ -23,6 +23,9 @@ jobs:
       - name: Get clang (Proton, works well with 4.19 kernels)
         run: |
           git clone --depth=1 https://github.com/kdrag0n/proton-clang $HOME/clang
+          # Proton ships an old GNU ld that can't read new glibc (.relr.dyn).
+          # Remove it so host tools (fixdep etc.) link with the system ld.
+          rm -f $HOME/clang/bin/ld
           echo "$HOME/clang/bin" >> $GITHUB_PATH
 
       - name: Build
