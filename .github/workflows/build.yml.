@@ -1,0 +1,53 @@
+name: Build TB128FU kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout kernel (with AnyKernel3 submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev libncurses-dev \
+            build-essential zip python3 ccache cpio libelf-dev \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+
+      - name: Get clang (Proton, works well with 4.19 kernels)
+        run: |
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang $HOME/clang
+          echo "$HOME/clang/bin" >> $GITHUB_PATH
+
+      - name: Build
+        run: |
+          export ARCH=arm64
+          export SUBARCH=arm64
+          make O=out grass-perf_defconfig
+          make O=out -j$(nproc) \
+            CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm \
+            OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            LLVM=1 LLVM_IAS=1 2>&1 | tee build.log
+
+      - name: Package with AnyKernel3
+        run: |
+          cp out/arch/arm64/boot/Image AnyKernel3/
+          find out/arch/arm64/boot/dts -name '*.dtb' -exec cp {} AnyKernel3/ \; || true
+          cd AnyKernel3 && zip -r9 ../tb128fu-kernel.zip . -x '.git*'
+
+      - name: Upload zip and raw Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: tb128fu-kernel
+          path: |
+            tb128fu-kernel.zip
+            out/arch/arm64/boot/Image
+            build.log
