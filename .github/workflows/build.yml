@@ -13,34 +13,31 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Install dependencies
+      - name: Install dependencies + modern clang
         run: |
           sudo apt-get update
           sudo apt-get install -y bc bison flex libssl-dev libncurses-dev \
-            build-essential zip python3 ccache cpio libelf-dev \
+            build-essential zip python3 cpio libelf-dev \
+            clang-18 lld-18 llvm-18 \
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
-
-      - name: Get clang (Proton, works well with 4.19 kernels)
-        run: |
-          git clone --depth=1 https://github.com/kdrag0n/proton-clang $HOME/clang
-          # Proton ships an old GNU ld that can't read new glibc (.relr.dyn).
-          # Remove it so host tools (fixdep etc.) link with the system ld.
-          rm -f $HOME/clang/bin/ld
-          echo "$HOME/clang/bin" >> $GITHUB_PATH
+          # unversioned clang, ld.lld, llvm-ar ... live here
+          echo "/usr/lib/llvm-18/bin" >> $GITHUB_PATH
 
       - name: Build
         shell: bash
         run: |
           set -o pipefail
+          clang --version | head -1
           export ARCH=arm64
           export SUBARCH=arm64
-          make O=out grass-perf_defconfig
-          make O=out -j$(nproc) \
-            CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm \
+          ARGS="CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm \
             OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            LLVM=1 LLVM_IAS=1 2>&1 | tee build.log
+            LLVM=1 LLVM_IAS=1"
+          make O=out $ARGS grass-perf_defconfig
+          make O=out $ARGS olddefconfig
+          make O=out $ARGS -j$(nproc) 2>&1 | tee build.log
 
       - name: Show build errors
         if: failure()
